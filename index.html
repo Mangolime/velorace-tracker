@@ -51,7 +51,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 let participantsLayer = L.layerGroup().addTo(map);
 
 function icon(html, cls="") {
-  return L.divIcon({html, className:cls, iconSize:null, iconAnchor:null});
+  return L.divIcon({html, className:cls, iconSize: [34, 34], iconAnchor: [17, 17]});
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -125,13 +125,23 @@ checkpoints.forEach(cp => {
   cpGroup.addLayer(m);
 });
 
+// Улучшенный поиск чекпойнта по частичному совпадению
 function findCheckpoint(name) {
   const key = checkpointKey(name);
-  return checkpoints.find(c => c.key === key) || null;
+  // Точное совпадение
+  let found = checkpoints.find(c => c.key === key);
+  if (found) return found;
+  // Частичное совпадение по словам
+  const words = key.split(/\s+/);
+  for (let word of words) {
+    if (word.length < 3) continue;
+    const c = checkpoints.find(c => c.key.includes(word) || word.includes(c.key));
+    if (c) return c;
+  }
+  return null;
 }
 
 async function refresh() {
-  // Используем прокси для обхода CORS
   const proxy = "https://api.allorigins.win/raw?url=";
   const target = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&_=${Date.now()}`;
   const url = proxy + encodeURIComponent(target);
@@ -160,9 +170,14 @@ async function refresh() {
     participantsLayer.clearLayers();
 
     const groups = {};
+    let matched = 0, unmatched = 0;
     people.forEach(p => {
       const cp = findCheckpoint(p.cp);
-      if (!cp) return;
+      if (!cp) {
+        unmatched++;
+        return;
+      }
+      matched++;
       if (p.name === "Красков") {
         const m = L.marker([cp.lat, cp.lon], {icon: icon('<div class="kr-marker">К</div>')});
         m.bindPopup(`<b>Красков</b><br>${escapeHtml(cp.name)}<br>${escapeHtml(p.time)}`);
@@ -188,6 +203,7 @@ async function refresh() {
     const now = new Date();
     document.getElementById("status").textContent =
       `Участников: ${people.length} · обновлено ${now.toLocaleString("ru-RU")}`;
+    console.log(`Сопоставлено: ${matched}, не сопоставлено: ${unmatched}`);
   } catch(e) {
     document.getElementById("status").textContent = "Не удалось обновить данные: " + e.message;
   }
