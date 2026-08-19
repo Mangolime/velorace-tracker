@@ -1,177 +1,480 @@
-<!doctype html>
+{`<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Велозаезд — отслеживание</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<link rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
-html,body,#map{height:100%;margin:0}
-body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-#map{background:#eee}
-.panel{position:absolute;z-index:1000;top:12px;left:12px;background:#fff;padding:12px 14px;border-radius:10px;box-shadow:0 2px 12px #0002;max-width:310px}
-.title{font-weight:700;font-size:17px;margin-bottom:6px}
-.status{font-size:13px;color:#555}
-.legend{margin-top:8px;font-size:13px;line-height:1.5}
-.dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
-.kp{background:#555}.main{background:#2b78c5}.alt{background:#d05a3a}.kr{background:#8e44ad}
-.kp-label{font-weight:700}
-.kr-marker{width:28px;height:28px;border-radius:50%;background:#8e44ad;border:3px solid white;box-shadow:0 1px 6px #0008;color:white;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
-.count-marker{width:34px;height:34px;border-radius:50%;background:#333;border:3px solid white;box-shadow:0 1px 6px #0007;color:white;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
-.kp-marker{width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid #555;box-shadow:0 1px 5px #0006}
-table{border-collapse:collapse;font-size:13px}
-td,th{padding:3px 7px;border-bottom:1px solid #ddd;text-align:left}
+html,body,#map{
+  height:100%;
+  margin:0;
+}
+
+body{
+  font-family:Arial,sans-serif;
+}
+
+.panel{
+  position:absolute;
+  z-index:1000;
+  top:12px;
+  left:12px;
+  background:white;
+  padding:12px 15px;
+  border-radius:10px;
+  box-shadow:0 2px 10px #0003;
+  max-width:320px;
+}
+
+.title{
+  font-size:18px;
+  font-weight:bold;
+}
+
+.status{
+  font-size:13px;
+  margin-top:6px;
+  color:#555;
+}
+
+.legend{
+  font-size:13px;
+  margin-top:8px;
+  line-height:1.6;
+}
+
+.dot{
+  width:12px;
+  height:12px;
+  display:inline-block;
+  border-radius:50%;
+  margin-right:5px;
+}
+
+.main{background:#1976d2;}
+.alt{background:#ef6c00;}
+.cp{background:#555;}
+.kr{background:#7b1fa2;}
+.dnf{background:#c62828;}
+
+.kr-marker{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#7b1fa2;
+  border:3px solid white;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  box-shadow:0 1px 8px #0008;
+}
+
+.count-marker{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#333;
+  border:3px solid white;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  box-shadow:0 1px 8px #0008;
+}
+
+.dnf-marker{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  background:#c62828;
+  border:3px solid white;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  box-shadow:0 1px 8px #0008;
+}
+
+.kp-marker{
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:white;
+  border:3px solid #555;
+}
 </style>
 </head>
+
 <body>
+
 <div class="panel">
-  <div class="title">🚴 Отслеживание велозаезда</div>
-  <div class="status" id="status">Загрузка…</div>
-  <div class="legend">
-    <div><span class="dot main"></span> основной маршрут</div>
-    <div><span class="dot alt"></span> объезд через Зашеек</div>
-    <div><span class="dot kp"></span> чекпойнт</div>
-    <div><span class="dot kr"></span> Красков</div>
-  </div>
+
+<div class="title">🚴 Велозаезд</div>
+
+<div id="status" class="status">
+Загрузка данных...
 </div>
+
+<div class="legend">
+
+<div><span class="dot main"></span>Основной маршрут</div>
+<div><span class="dot alt"></span>Объезд через Зашеек</div>
+<div><span class="dot cp"></span>Чекпойнты</div>
+<div><span class="dot kr"></span>Красков</div>
+<div><span class="dot dnf"></span>Сход</div>
+
+</div>
+</div>
+
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-const SHEET_ID = "1aU_QtwN_dyuxxvN-3DkFl0CwfCPxWH-ZdVDLDdIeZcU";
-const SHEET_GID = "0";
-const UPDATE_MS = 15 * 60 * 1000;
 
-const map = L.map("map", {preferCanvas:true}).setView([64.5,32.2], 7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
+const SHEET_ID="1aU_QtwN_dyuxxvN-3DkFl0CwfCPxWH-ZdVDLDdIeZcU";
+const GID="0";
 
-let participantsLayer = L.layerGroup().addTo(map);
+const UPDATE=15*60*1000;
 
-function icon(html, cls="") {
-  return L.divIcon({html, className:cls, iconSize:null, iconAnchor:null});
+const map=L.map("map").setView([64.5,32.2],7);
+
+L.tileLayer(
+ "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+ {
+  attribution:"© OpenStreetMap"
+ }
+).addTo(map);
+
+let participantLayer=L.layerGroup().addTo(map);
+
+function marker(html){
+ return L.divIcon({
+  html:html,
+  className:"",
+  iconSize:null
+ });
 }
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function esc(x){
+ return String(x)
+ .replaceAll("&","&amp;")
+ .replaceAll("<","&lt;")
+ .replaceAll(">","&gt;");
 }
-function normalizeCheckpoint(s) {
-  return String(s || "")
-    .replace(/^ЧЕКПОЙНТ\s+/i,"")
-    .replace(/\s+/g," ")
-    .replace(/\s*-\s*/g," - ")
-    .trim();
+
+function normalize(x){
+ return String(x||"")
+ .replace(/ЧЕКПОЙНТ/gi,"")
+ .replace(/\\s+/g," ")
+ .trim();
 }
-function checkpointKey(s) {
-  let x = normalizeCheckpoint(s).toLowerCase();
-  x = x.replace("пяозерский (или софпорог)", "пяозерский");
-  x = x.replace("софпорог (или пяозерский)", "софпорог");
-  return x;
+
+function kmFromText(text){
+ const m=String(text).match(/(\\d+)\\s*км/i);
+ return m?Number(m[1]):null;
 }
-function parseCsv(text) {
-  const rows=[]; let row=[], cell="", q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i], n=text[i+1];
-    if(c==='"' && q && n==='"'){cell+='"';i++;continue}
-    if(c==='"'){q=!q;continue}
-    if(c===',' && !q){row.push(cell);cell="";continue}
-    if((c==='\n'||c==='\r') && !q){
-      if(c==='\r' && n==='\n') i++;
-      row.push(cell);cell="";
-      if(row.some(v=>v.trim()!=="")) rows.push(row);
-      row=[];continue;
-    }
-    cell+=c;
+
+function isDnf(text){
+ return /^Сход\\s+на/i.test(String(text).trim());
+}
+
+function parseCSV(text){
+
+ const rows=[];
+ let row=[];
+ let cell="";
+ let q=false;
+
+ for(let i=0;i<text.length;i++){
+
+  const c=text[i];
+
+  if(c=='"'){
+   q=!q;
+   continue;
   }
-  if(cell!=="" || row.length){row.push(cell);rows.push(row)}
-  return rows;
+
+  if(c=="," && !q){
+   row.push(cell);
+   cell="";
+   continue;
+  }
+
+  if((c=="\\n"||c=="\\r")&&!q){
+
+   if(c=="\\r"&&text[i+1]=="\\n") i++;
+
+   row.push(cell);
+   rows.push(row);
+
+   row=[];
+   cell="";
+   continue;
+  }
+
+  cell+=c;
+ }
+
+ if(cell||row.length){
+  row.push(cell);
+  rows.push(row);
+ }
+
+ return rows;
 }
 
-fetch("main.geojson").then(r=>r.json()).then(g => {
-  L.geoJSON(g,{style:{weight:4,opacity:.85,color:"#2b78c5"}}).addTo(map);
-});
-fetch("alt.geojson").then(r=>r.json()).then(g => {
-  L.geoJSON(g,{style:{weight:4,opacity:.85,color:"#d05a3a",dashArray:"8 6"}}).addTo(map);
+let checkpoints=[];
+
+fetch("checkpoints.geojson")
+.then(r=>r.json())
+.then(g=>{
+
+ checkpoints=g.features.map(f=>({
+
+  name:f.properties.name,
+  route:f.properties.route,
+  lat:f.geometry.coordinates[1],
+  lon:f.geometry.coordinates[0],
+  km:kmFromText(f.properties.name)
+
+ }));
+
+ checkpoints.forEach(cp=>{
+
+  const m=L.marker(
+   [cp.lat,cp.lon],
+   {
+    icon:marker('<div class="kp-marker"></div>')
+   }
+  );
+
+  m.bindTooltip(cp.name);
+
+  m.addTo(map);
+
+ });
+
 });
 
-let checkpoints = [];
-fetch("checkpoints.geojson").then(r=>r.json()).then(g => {
-  checkpoints = g.features.map(f => ({
-    name:f.properties.name,
-    route:f.properties.route,
-    lat:f.geometry.coordinates[1],
-    lon:f.geometry.coordinates[0],
-    key:checkpointKey(f.properties.name)
-  }));
-  const group=L.layerGroup().addTo(map);
-  checkpoints.forEach(cp=>{
-    const m=L.marker([cp.lat,cp.lon],{icon:icon('<div class="kp-marker"></div>')});
-    m.bindTooltip(cp.name,{direction:"top",offset:[0,-6]});
-    group.addLayer(m);
+fetch("main.geojson")
+.then(r=>r.json())
+.then(g=>{
+ L.geoJSON(g,{
+  style:{
+   color:"#1976d2",
+   weight:4
+  }
+ }).addTo(map);
+});
+
+fetch("alt.geojson")
+.then(r=>r.json())
+.then(g=>{
+ L.geoJSON(g,{
+  style:{
+   color:"#ef6c00",
+   weight:4,
+   dashArray:"8 6"
+  }
+ }).addTo(map);
+});
+
+function checkpointByText(text){
+
+ const km=kmFromText(text);
+
+ if(km==null) return null;
+
+ const dnf=isDnf(text);
+
+ if(dnf){
+
+  return checkpoints.find(c=>c.km==km);
+
+ }
+
+ const n=normalize(text).toLowerCase();
+
+ let cp=checkpoints.find(c=>
+  normalize(c.name).toLowerCase()==n
+ );
+
+ if(cp) return cp;
+
+ return checkpoints.find(c=>c.km==km);
+
+}
+
+async function load(){
+
+ try{
+
+  const url=
+  "https://docs.google.com/spreadsheets/d/"
+  +SHEET_ID+
+  "/export?format=csv&gid="
+  +GID+
+  "&_="+Date.now();
+
+  const r=await fetch(url,{cache:"no-store"});
+
+  if(!r.ok) throw new Error("Google Sheets "+r.status);
+
+  const csv=await r.text();
+
+  const rows=parseCSV(csv);
+
+  const head=rows[0];
+
+  const iName=head.indexOf("Фамилия");
+  const iCp=head.indexOf("Последний пройденный КП");
+  const iTime=head.indexOf("Временная отметка");
+
+  if(iName<0||iCp<0||iTime<0)
+   throw new Error("Не найдены столбцы");
+
+  const people=[];
+
+  rows.slice(1).forEach(r=>{
+
+   if(!r[iName]) return;
+
+   people.push({
+    name:r[iName].trim(),
+    cp:r[iCp].trim(),
+    time:r[iTime].trim()
+   });
+
   });
-  const all = L.featureGroup([
-    L.geoJSON(g),
-  ]);
-});
 
-function findCheckpoint(name) {
-  const key=checkpointKey(name);
-  return checkpoints.find(c=>c.key===key) || checkpoints.find(c=>key.includes(c.key)||c.key.includes(key));
+  participantLayer.clearLayers();
+
+  const groups={};
+  const dnfs=[];
+
+  people.forEach(p=>{
+
+   const cp=checkpointByText(p.cp);
+
+   if(!cp) return;
+
+   if(isDnf(p.cp)){
+    dnfs.push({...p,cp});
+    return;
+   }
+
+   if(p.name==="Красков"){
+
+    const m=L.marker(
+     [cp.lat,cp.lon],
+     {
+      icon:marker('<div class="kr-marker">К</div>')
+     }
+    );
+
+    m.bindPopup(
+     "<b>Красков</b><br>"
+     +esc(cp.name)+"<br>"
+     +esc(p.time)
+    );
+
+    participantLayer.addLayer(m);
+
+    return;
+   }
+
+   const key=cp.name;
+
+   if(!groups[key])
+    groups[key]={cp:cp,people:[]};
+
+   groups[key].people.push(p);
+
+  });
+
+  Object.values(groups).forEach(g=>{
+
+   g.people.sort((a,b)=>a.time.localeCompare(b.time));
+
+   let html="<b>"+esc(g.cp.name)+"</b><br><br>";
+
+   html+="<table>";
+
+   html+="<tr><th>Участник</th><th>Время</th></tr>";
+
+   g.people.forEach(p=>{
+    html+="<tr><td>"+esc(p.name)+"</td><td>"+esc(p.time)+"</td></tr>";
+   });
+
+   html+="</table>";
+
+   const m=L.marker(
+    [g.cp.lat,g.cp.lon],
+    {
+     icon:marker('<div class="count-marker">'+g.people.length+'</div>')
+    }
+   );
+
+   m.bindPopup(html);
+
+   participantLayer.addLayer(m);
+
+  });
+
+  dnfs.forEach(p=>{
+
+   const m=L.marker(
+    [p.cp.lat,p.cp.lon],
+    {
+     icon:marker('<div class="dnf-marker">×</div>')
+    }
+   );
+
+   m.bindPopup(
+    "<b>"+esc(p.name)+"</b><br>"
+    +"<b style='color:#c62828'>Сошёл</b><br>"
+    +"Отметка: "+esc(p.cp)+"<br>"
+    +esc(p.time)
+   );
+
+   participantLayer.addLayer(m);
+
+  });
+
+  const active=people.filter(p=>!isDnf(p.cp)).length;
+
+  const now=new Date();
+
+  document.getElementById("status").innerHTML=
+   "Всего: "+people.length+
+   "<br>В гонке: "+active+
+   "<br>Сошли: "+dnfs.length+
+   "<br>Обновлено: "+
+   now.toLocaleString("ru-RU");
+
+ }catch(e){
+
+  document.getElementById("status").innerHTML=
+   "Ошибка обновления<br>"+esc(e.message);
+
+ }
+
 }
 
-async function refresh() {
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&_=${Date.now()}`;
-  try {
-    const res=await fetch(url,{cache:"no-store"});
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const rows=parseCsv(await res.text());
-    if(!rows.length) throw new Error("Пустая таблица");
-    const head=rows[0].map(x=>x.trim());
-    const ixName=head.indexOf("Фамилия");
-    const ixCp=head.indexOf("Последний пройденный КП");
-    const ixTime=head.indexOf("Временная отметка");
-    if(ixName<0||ixCp<0||ixTime<0) throw new Error("Не найдены нужные столбцы");
+load();
 
-    const people=rows.slice(1).filter(r=>r[ixName] && r[ixCp]).map(r=>({
-      name:r[ixName].trim(),
-      cp:r[ixCp].trim(),
-      time:r[ixTime] ? r[ixTime].trim() : ""
-    }));
+setInterval(load,UPDATE);
 
-    participantsLayer.clearLayers();
-    const groups={};
-    people.forEach(p=>{
-      const cp=findCheckpoint(p.cp);
-      if(!cp) return;
-      if(p.name==="Красков") {
-        const m=L.marker([cp.lat,cp.lon],{icon:icon('<div class="kr-marker">К</div>')});
-        m.bindPopup(`<b>Красков</b><br>${escapeHtml(cp.name)}<br>${escapeHtml(p.time)}`);
-        participantsLayer.addLayer(m);
-      } else {
-        const k=cp.key;
-        if(!groups[k]) groups[k]={cp,people:[]};
-        groups[k].people.push(p);
-      }
-    });
-    Object.values(groups).forEach(g=>{
-      g.people.sort((a,b)=>a.time.localeCompare(b.time));
-      const rowsHtml=g.people.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.time)}</td></tr>`).join("");
-      const html=`<b>${escapeHtml(g.cp.name)}</b><br><br><table><tr><th>Участник</th><th>Время</th></tr>${rowsHtml}</table>`;
-      const m=L.marker([g.cp.lat,g.cp.lon],{icon:icon(`<div class="count-marker">${g.people.length}</div>`)});
-      m.bindPopup(html,{maxWidth:360});
-      participantsLayer.addLayer(m);
-    });
-
-    const now=new Date();
-    document.getElementById("status").textContent =
-      `Участников: ${people.length} · обновлено ${now.toLocaleString("ru-RU")}`;
-  } catch(e) {
-    document.getElementById("status").textContent =
-      "Не удалось обновить данные: "+e.message;
-  }
-}
-refresh();
-setInterval(refresh, UPDATE_MS);
 </script>
+
 </body>
-</html>
+</html>`}
