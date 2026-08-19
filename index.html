@@ -15,7 +15,7 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 .legend{margin-top:8px;font-size:13px;line-height:1.5}
 .dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .kp{background:#555}.main{background:#2b78c5}.alt{background:#d05a3a}.kr{background:#8e44ad}
-.kp-label{background:transparent;border:none;box-shadow:none;font-size:11px;font-weight:600;color:#222;text-shadow:0 0 4px #fff}
+.kp-label{background:transparent;border:none;box-shadow:none;font-size:11px;font-weight:600;color:#222;text-shadow:0 0 4px #fff;pointer-events:none}
 .kr-marker{width:28px;height:28px;border-radius:50%;background:#8e44ad;border:3px solid white;box-shadow:0 1px 6px #0008;color:white;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
 .count-marker{width:34px;height:34px;border-radius:50%;background:#333;border:3px solid white;box-shadow:0 1px 6px #0007;color:white;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
 .kp-marker{width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid #555;box-shadow:0 1px 5px #0006}
@@ -38,7 +38,7 @@ td,th{padding:3px 7px;border-bottom:1px solid #ddd;text-align:left}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const SHEET_ID = "1aU_QtwN_dyuxxvN-3DkFl0CwfCPxWH-ZdVDLDdIeZcU";
-const RANGE = "Лист1!A:C";
+const SHEET_GID = "0";
 const UPDATE_MS = 15 * 60 * 1000;
 
 const map = L.map("map", {zoomControl: false}).setView([64.5,32.2], 7);
@@ -70,6 +70,26 @@ function checkpointKey(s) {
   return x;
 }
 
+// Парсер CSV (из вашего исходного кода)
+function parseCsv(text) {
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i], n=text[i+1];
+    if(c==='"' && q && n==='"'){cell+='"';i++;continue}
+    if(c==='"'){q=!q;continue}
+    if(c===',' && !q){row.push(cell);cell="";continue}
+    if((c==='\n'||c==='\r') && !q){
+      if(c==='\r' && n==='\n') i++;
+      row.push(cell);cell="";
+      if(row.some(v=>v.trim()!=="")) rows.push(row);
+      row=[];continue;
+    }
+    cell+=c;
+  }
+  if(cell!=="" || row.length){row.push(cell);rows.push(row)}
+  return rows;
+}
+
 // --- Маршруты ---
 fetch("main.geojson").then(r=>r.json()).then(g => {
   L.geoJSON(g,{style:{weight:4,opacity:.85,color:"#2b78c5"}}).addTo(map);
@@ -78,7 +98,7 @@ fetch("alt.geojson").then(r=>r.json()).then(g => {
   L.geoJSON(g,{style:{weight:4,opacity:.85,color:"#d05a3a",dashArray:"8 6"}}).addTo(map);
 });
 
-// --- Чекпойнты (исправленные координаты) ---
+// --- Чекпойнты (координаты из вашего checkpoints.geojson) ---
 const checkpoints = [
   {name:"Харлу 53 км", lat:61.818814, lon:30.936934, key:"харлу"},
   {name:"Леппясюрья 116 км", lat:61.855420, lon:31.355277, key:"леппясюрья"},
@@ -111,13 +131,17 @@ function findCheckpoint(name) {
 }
 
 async function refresh() {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${RANGE}`;
+  // Используем прокси для обхода CORS
+  const proxy = "https://api.allorigins.win/raw?url=";
+  const target = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}&_=${Date.now()}`;
+  const url = proxy + encodeURIComponent(target);
+
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
-    const rows = data.values;
-    if (!rows || rows.length < 2) throw new Error("Нет данных");
+    const csv = await res.text();
+    const rows = parseCsv(csv);
+    if (!rows.length) throw new Error("Пустая таблица");
 
     const head = rows[0].map(x => String(x).trim());
     const ixName = head.indexOf("Фамилия");
